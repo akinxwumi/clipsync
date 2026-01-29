@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClipSync</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- View: Setup -->
+    <div id="view-setup" class="view">
+      <button id="btn-theme-setup" class="theme-toggle-absolute" title="Toggle Theme">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+      </button>
+      <div class="hero">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+          </svg>
+        </div>
+        <h1>ClipSync</h1>
+        <p>Sync your clipboard across browsers</p>
+        <small class="subtitle">Private & secure with end-to-end encryption</small>
+      </div>
+
+      <div class="setup-actions">
+        <button id="btn-create" class="btn btn-primary btn-glow">
+          Generate New Code
+        </button>
+
+        <div class="divider">
+          <div class="line"></div>
+          <span>OR</span>
+          <div class="line"></div>
+        </div>
+
+        <div class="input-wrapper">
+          <input type="text" id="input-code" placeholder="Enter code e.g. happy-cat-123" autocomplete="off"
+            spellcheck="false">
+          <button id="btn-join" class="btn btn-secondary">Connect</button>
+        </div>
+      </div>
+
+      <div id="setup-error" class="error-msg"></div>
+    </div>
+
+    <!-- View: Dashboard -->
+    <div id="view-dashboard" class="view hidden">
+      <header class="dashboard-header">
+        <div class="header-left">
+          <span class="logo-text">ClipSync</span>
+        </div>
+        <div class="header-right">
+          <div class="connection-status connecting" id="status-badge">
+            <div class="status-dot"></div>
+            <span class="status-label">Connecting</span>
+          </div>
+          <!-- Header Menu -->
+          <div class="header-menu-wrapper">
+            <button class="btn-header-menu" title="Options">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="12" cy="5" r="1"></circle>
+                <circle cx="12" cy="19" r="1"></circle>
+              </svg>
+            </button>
+            <div class="header-dropdown">
+              <button class="dropdown-item action-show-code">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+                <span>Get Sync Code</span>
+              </button>
+              <button class="dropdown-item action-toggle-theme" id="btn-theme-light">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <span>Light Mode</span>
+              </button>
+              <button class="dropdown-item action-toggle-theme" id="btn-theme-dark">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+                <span>Dark Mode</span>
+              </button>
+              <button class="dropdown-item action-reset" id="btn-reset">
+                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                </svg>
+                <span>Reset</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Sync Code Modal (hidden by default) -->
+      <div id="sync-code-modal" class="sync-code-modal hidden">
+        <div class="sync-code-content">
+          <div class="sync-code-header">
+            <span class="sync-code-title">Your Sync Code</span>
+            <button class="btn-close-modal" id="btn-close-code-modal">
+              <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="code-pill" id="display-code" title="Click to copy">
+            <span class="code-text">...</span>
+            <span class="copy-hint">Click to copy</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Clipboard Section -->
+      <div class="clipboard-section">
+        <div class="section-header">
+          <div class="section-title">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+            </svg>
+            Clipboard
+          </div>
+          <button id="btn-refresh-clip" class="btn-icon-only" title="Refresh clipboard">
+            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="current-clipboard" class="current-clipboard">
+          <div class="clipboard-preview">
+            <span class="placeholder">Reading clipboard...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unified History Section -->
+      <div class="history-container">
+        <div class="section-title">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          History
+        </div>
+        <div id="history-list" class="history-list">
+          <!-- Unified history items -->
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+
+</html>

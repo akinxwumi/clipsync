@@ -1,0 +1,36 @@
+{
+  "manifest_version": 3,
+  "name": "ClipSync",
+  "version": "1.0.0",
+  "description": "Sync your clipboard across browsers privately.",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "offscreen",
+    "clipboardRead",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ClipSync",
+    "default_icon": {
+      "16": "icon.png",
+      "32": "icon.png",
+      "48": "icon.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon.png",
+    "32": "icon.png",
+    "48": "icon.png",
+    "128": "icon128.png"
+  }
+}
