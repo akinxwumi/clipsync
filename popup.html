@@ -138,26 +138,17 @@
 
       <!-- Current Clipboard Section -->
       <div class="clipboard-section">
-        <div class="section-header">
-          <div class="section-title">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-            </svg>
-            Clipboard
+        <div id="current-clipboard" class="current-clipboard">
+          <div class="clipboard-preview">
+            <span class="placeholder">Reading clipboard...</span>
           </div>
-          <button id="btn-refresh-clip" class="btn-icon-only" title="Refresh clipboard">
+          <button id="btn-sync-now" class="btn-sync-embedded" title="Sync clipboard">
             <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"></polyline>
               <polyline points="1 20 1 14 7 14"></polyline>
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
           </button>
-        </div>
-        <div id="current-clipboard" class="current-clipboard">
-          <div class="clipboard-preview">
-            <span class="placeholder">Reading clipboard...</span>
-          </div>
         </div>
       </div>
 

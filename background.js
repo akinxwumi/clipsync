@@ -91,11 +91,23 @@ function handleIncomingText(msg) {
     chrome.storage.local.get(['history'], (result) => {
         let history = result.history || [];
 
-        // Avoid duplicates
-        if (history.some(h => h.id === msg.id)) return;
+        // Avoid duplicates by ID or text content
+        const existingIndex = history.findIndex(h => h.id === msg.id || h.text === msg.text);
 
-        history.unshift(msg);
-        if (history.length > 20) history.pop();
+        if (existingIndex !== -1) {
+            // Update existing item and move to top
+            const existing = history.splice(existingIndex, 1)[0];
+            existing.timestamp = msg.timestamp || Date.now();
+            history.unshift(existing);
+        } else {
+            // Add new item
+            history.unshift(msg);
+        }
+
+        // Keep only last 20 items
+        if (history.length > 20) {
+            history = history.slice(0, 20);
+        }
 
         chrome.storage.local.set({ history }, () => {
             chrome.action.setBadgeText({ text: 'NEW' });

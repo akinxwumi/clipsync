@@ -120,9 +120,9 @@ function setupPeerEvents(p) {
     });
 
     p.on('disconnected', () => {
-        console.log("Peer disconnected from server.");
-        // Optional: reconnect logic
-        // p.reconnect();
+        console.log("Peer disconnected from server. Attempting to reconnect...");
+        // Attempt to reconnect with exponential backoff
+        attemptReconnect(p, 0);
     });
 
     p.on('close', () => {
@@ -133,6 +133,40 @@ function setupPeerEvents(p) {
     p.on('error', (err) => {
         console.error("Peer error:", err);
     });
+}
+
+function attemptReconnect(p, attemptCount) {
+    const maxAttempts = 5;
+    const baseDelay = 1000; // 1 second
+
+    if (attemptCount >= maxAttempts) {
+        console.error("Max reconnection attempts reached. Please refresh the extension.");
+        return;
+    }
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+    const delay = baseDelay * Math.pow(2, attemptCount);
+
+    console.log(`Reconnection attempt ${attemptCount + 1}/${maxAttempts} in ${delay}ms...`);
+
+    setTimeout(() => {
+        if (!p.destroyed) {
+            p.reconnect();
+
+            // Check if reconnection was successful after a short delay
+            setTimeout(() => {
+                if (p.disconnected && !p.destroyed) {
+                    attemptReconnect(p, attemptCount + 1);
+                } else {
+                    console.log("Reconnection successful!");
+                    // Re-establish connections to peers
+                    if (currentGroupId) {
+                        connectToPeers(currentGroupId);
+                    }
+                }
+            }, 2000);
+        }
+    }, delay);
 }
 
 function setupConnection(conn) {

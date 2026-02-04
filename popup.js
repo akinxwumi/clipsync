@@ -57,7 +57,6 @@ const els = {
 
     // Clipboard elements
     currentClipboard: document.getElementById('current-clipboard'),
-    btnRefreshClip: document.getElementById('btn-refresh-clip'),
 
     // Unified history
     historyList: document.getElementById('history-list'),
@@ -199,11 +198,6 @@ els.btnJoin.addEventListener('click', async () => {
     await connect(code);
 });
 
-// Clipboard Events
-els.btnRefreshClip?.addEventListener('click', async () => {
-    await refreshClipboard();
-});
-
 els.displayCode?.addEventListener('click', () => {
     navigator.clipboard.writeText(syncCode);
     const originalText = els.codeText.textContent;
@@ -262,13 +256,10 @@ function displayCurrentClipboard(text) {
     els.currentClipboard.innerHTML = `
         <div class="clipboard-preview">
             <div class="clipboard-text">${escapeHtmlFull(text)}</div>
-            <div class="clipboard-actions">
-                <button class="btn-sync-now" id="btn-sync-current">
-                    ${ICONS.sync}
-                    <span>Sync</span>
-                </button>
-            </div>
         </div>
+        <button id="btn-sync-current" class="btn-sync-embedded" title="Sync clipboard">
+            ${ICONS.sync}
+        </button>
     `;
 
     const btnSync = document.getElementById('btn-sync-current');
@@ -283,16 +274,18 @@ function displayCurrentClipboard(text) {
  * Add item to history
  * @param {string} text - The text content
  * @param {string} source - 'local' (copied) or 'synced' (received from another device)
+ * @param {string} existingId - Optional ID if this is an existing item being updated
  * @returns {boolean} - Whether item was added (false if duplicate)
  */
-async function addToHistory(text, source = 'local') {
+async function addToHistory(text, source = 'local', existingId = null) {
     const data = await chrome.storage.local.get(['history']);
     let history = data.history || [];
 
-    // Check for duplicates (same text content)
-    const existingIndex = history.findIndex(h => h.text === text);
+    // Check for duplicates by text content or ID
+    const existingIndex = history.findIndex(h => h.text === text || (existingId && h.id === existingId));
+
     if (existingIndex !== -1) {
-        // If it exists, just move it to the top and update timestamp
+        // Item exists - move to top and update timestamp
         const existing = history.splice(existingIndex, 1)[0];
         existing.timestamp = Date.now();
         // Keep original source - don't change synced to local
@@ -302,10 +295,11 @@ async function addToHistory(text, source = 'local') {
         return false;
     }
 
+    // Create new item
     const newItem = {
         text: text,
         timestamp: Date.now(),
-        id: crypto.randomUUID(),
+        id: existingId || crypto.randomUUID(),
         source: source // 'local' or 'synced'
     };
 
@@ -334,15 +328,7 @@ function renderHistory(items) {
     // Sort by timestamp descending
     items.sort((a, b) => b.timestamp - a.timestamp);
 
-    // Filter out current clipboard to avoid showing it twice
-    const filteredItems = items.filter(item => item.text !== currentClipboardText);
-
-    if (filteredItems.length === 0) {
-        els.historyList.innerHTML = '<div class="empty-state">No history yet.</div>';
-        return;
-    }
-
-    filteredItems.forEach(item => {
+    items.forEach(item => {
         addHistoryItemToDOM(item);
     });
 }
@@ -400,8 +386,24 @@ function addHistoryItemToDOM(item) {
         await navigator.clipboard.writeText(item.text);
         dropdown.classList.remove('open');
         activeDropdown = null;
-        // Don't add to history again - it's already there, just refresh display
-        await refreshClipboard();
+
+        // Update current clipboard display and move item to top of history
+        currentClipboardText = item.text;
+        displayCurrentClipboard(item.text);
+
+        // Move this item to the top of history without creating a duplicate
+        const data = await chrome.storage.local.get(['history']);
+        let history = data.history || [];
+
+        // Find and move the item to the top
+        const itemIndex = history.findIndex(h => h.id === item.id);
+        if (itemIndex !== -1) {
+            const [movedItem] = history.splice(itemIndex, 1);
+            movedItem.timestamp = Date.now();
+            history.unshift(movedItem);
+            await chrome.storage.local.set({ history });
+            renderHistory(history);
+        }
     });
 
     // Sync action
