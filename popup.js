@@ -55,6 +55,7 @@ const els = {
 
     // Clipboard elements
     currentClipboard: document.getElementById('current-clipboard'),
+    clipboardBanner: document.getElementById('clipboard-banner'),
 
     // Unified history
     historyList: document.getElementById('history-list'),
@@ -78,6 +79,7 @@ const els = {
 
 let syncCode = null;
 let currentClipboardText = '';
+let bannerTimeout = null;
 let activeDropdown = null;
 let headerDropdownOpen = false;
 
@@ -262,12 +264,28 @@ function displayCurrentClipboard(text) {
         <div class="clipboard-preview">
             <div class="clipboard-text">${escapeHtmlFull(text)}</div>
         </div>
-        <button id="btn-sync-current" class="btn-sync-embedded" title="Sync clipboard">
-            ${ICONS.sync}
-        </button>
+        <div class="clipboard-actions-embedded">
+            <button id="btn-copy-current" class="btn-action-embedded" title="Copy clipboard">
+                ${ICONS.copy}
+            </button>
+            <button id="btn-sync-current" class="btn-action-embedded" title="Sync clipboard">
+                ${ICONS.sync}
+            </button>
+        </div>
     `;
 
+    const btnCopy = document.getElementById('btn-copy-current');
     const btnSync = document.getElementById('btn-sync-current');
+    btnCopy?.addEventListener('click', async () => {
+        if (!currentClipboardText?.trim()) return;
+        try {
+            await navigator.clipboard.writeText(currentClipboardText);
+            showClipboardBanner('Copied to clipboard', 'success');
+        } catch (err) {
+            showClipboardBanner('Copy failed', 'error');
+        }
+    });
+
     btnSync?.addEventListener('click', async () => {
         await performSync(currentClipboardText, btnSync);
     });
@@ -395,26 +413,28 @@ async function deleteHistoryItem(itemId) {
 // ========== SYNC FUNCTIONALITY ==========
 
 async function performSync(text, btnElement) {
-    const originalLabel = btnElement.innerHTML;
-    btnElement.innerHTML = '<span>Sending...</span>';
+    if (!text || !text.trim()) {
+        showClipboardBanner('Nothing to send', 'info');
+        return;
+    }
+
     btnElement.disabled = true;
 
     try {
         const res = await chrome.runtime.sendMessage({ cmd: 'sync_text', text });
         if (res.success) {
-            btnElement.innerHTML = '<span>✓ Sent!</span>';
+            showClipboardBanner('Sent', 'success');
         } else {
             showError("Failed: " + (res.error || "Unknown"));
-            btnElement.innerHTML = originalLabel;
+            showClipboardBanner('Sync failed', 'error');
         }
     } catch (err) {
         showError("Error: " + err.message);
-        btnElement.innerHTML = originalLabel;
+        showClipboardBanner('Sync failed', 'error');
     } finally {
         setTimeout(() => {
-            btnElement.innerHTML = originalLabel;
             btnElement.disabled = false;
-        }, 2000);
+        }, 450);
     }
 }
 
@@ -486,6 +506,7 @@ chrome.runtime.onMessage.addListener(async (msg) => {
         if (msg.msg?.text) {
             currentClipboardText = msg.msg.text;
             displayCurrentClipboard(msg.msg.text);
+            showClipboardBanner('New broadcast received', 'info');
         }
         await syncFromStorage();
     }
@@ -507,6 +528,19 @@ async function syncFromStorage() {
         currentClipboardText = data.currentClipboard.text;
         displayCurrentClipboard(data.currentClipboard.text);
     }
+}
+
+function showClipboardBanner(message, type = 'info') {
+    if (!els.clipboardBanner) return;
+    els.clipboardBanner.textContent = message;
+    els.clipboardBanner.className = `clipboard-banner show ${type}`;
+
+    if (bannerTimeout) clearTimeout(bannerTimeout);
+    bannerTimeout = setTimeout(() => {
+        if (!els.clipboardBanner) return;
+        els.clipboardBanner.className = 'clipboard-banner';
+        els.clipboardBanner.textContent = '';
+    }, 2200);
 }
 
 function escapeHtml(text) {

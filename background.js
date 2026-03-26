@@ -107,9 +107,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 });
 
 async function handleIncomingText(msg) {
-    await ensureOffscreen();
-    await writeClipboardViaOffscreen(msg.text || '');
-
     const state = await updateClipboardState({
         text: msg.text,
         source: 'synced',
@@ -123,23 +120,6 @@ async function handleIncomingText(msg) {
     // Notify all views (Popup)
     chrome.runtime.sendMessage({ cmd: 'incoming_text', msg: state.currentClipboard });
     chrome.runtime.sendMessage({ cmd: 'clipboard_state_updated', state });
-}
-
-async function writeClipboardViaOffscreen(text) {
-    return new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-            target: 'offscreen',
-            cmd: 'write_clipboard',
-            data: { text }
-        }, (response) => {
-            if (chrome.runtime.lastError) {
-                console.warn('Offscreen clipboard write failed:', chrome.runtime.lastError.message);
-                resolve(false);
-                return;
-            }
-            resolve(!!response?.success);
-        });
-    });
 }
 
 async function updateClipboardState(nextItem) {

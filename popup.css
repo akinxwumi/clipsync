@@ -633,7 +633,7 @@ input[type="text"]:focus {
   word-break: break-word;
   white-space: pre-wrap;
   padding-right: 8px;
-  padding-bottom: 44px;
+  padding-bottom: 54px;
   font-family: var(--font-family);
 }
 
@@ -665,11 +665,16 @@ input[type="text"]:focus {
   height: 100%;
 }
 
-/* Embedded Sync Button - ChatGPT Style */
-.btn-sync-embedded {
+.clipboard-actions-embedded {
   position: absolute;
   bottom: 12px;
   right: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.btn-action-embedded {
   background: var(--surface-hover);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -682,10 +687,9 @@ input[type="text"]:focus {
   transition: all 0.2s ease;
   color: var(--text-secondary);
   padding: 0;
-  z-index: 10;
 }
 
-.btn-sync-embedded:hover {
+.btn-action-embedded:hover {
   background: var(--primary);
   border-color: var(--primary);
   color: white;
@@ -693,17 +697,44 @@ input[type="text"]:focus {
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
 }
 
-.btn-sync-embedded:active {
+.btn-action-embedded:active {
   transform: scale(0.95);
 }
 
-.btn-sync-embedded .icon {
+.btn-action-embedded .icon {
   width: 18px;
   height: 18px;
 }
 
-.btn-sync-embedded:hover .icon {
+.btn-action-embedded:hover .icon {
   animation: spin 0.5s ease;
+}
+
+.clipboard-banner {
+  margin-top: 10px;
+  min-height: 20px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.clipboard-banner.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.clipboard-banner.success {
+  color: var(--success);
+}
+
+.clipboard-banner.info {
+  color: var(--primary);
+}
+
+.clipboard-banner.error {
+  color: var(--error);
 }
 
 .btn-sync-now {
