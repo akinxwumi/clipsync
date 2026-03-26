@@ -36,6 +36,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ connected: sync.isConnected() });
         return false;
     }
+
+    if (cmd === 'write_clipboard') {
+        navigator.clipboard.writeText(data.text || '')
+            .then(() => sendResponse({ success: true }))
+            .catch((err) => sendResponse({ success: false, error: err.toString() }));
+        return true;
+    }
 });
 
 // Periodic keep-alive (optional, but helps if browser tries to kill offscreen)

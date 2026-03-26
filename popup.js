@@ -37,8 +37,6 @@ const ICONS = {
     </svg>`
 };
 
-const MAX_HISTORY = 20;
-
 const views = {
     setup: document.getElementById('view-setup'),
     dashboard: document.getElementById('view-dashboard')
@@ -101,11 +99,15 @@ document.addEventListener('click', (e) => {
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
     initTheme();
-    const data = await chrome.storage.local.get(['syncCode', 'history']);
+    const data = await chrome.storage.local.get(['syncCode', 'history', 'currentClipboard']);
 
     if (data.syncCode) {
         showDashboard(data.syncCode);
         renderHistory(data.history || []);
+        if (data.currentClipboard?.text) {
+            currentClipboardText = data.currentClipboard.text;
+            displayCurrentClipboard(data.currentClipboard.text);
+        }
         // Focus window and read clipboard after a short delay
         window.focus();
         setTimeout(async () => {
@@ -145,7 +147,7 @@ function setupHeaderMenu() {
         headerDropdownOpen = false;
 
         if (confirm("Reset ClipSync? This will clear your sync code and all history. You'll need to generate or enter a new code.")) {
-            await chrome.storage.local.remove(['syncCode', 'history']);
+            await chrome.storage.local.remove(['syncCode', 'history', 'currentClipboard']);
             syncCode = null;
             showSetup();
             chrome.runtime.reload();
@@ -218,8 +220,7 @@ async function refreshClipboard(retries = 2) {
 
         if (text && text.trim()) {
             displayCurrentClipboard(text);
-            // Add to history if it's new (source: local)
-            await addToHistory(text, 'local');
+            await setCurrentClipboardState(text, 'local');
         } else {
             els.currentClipboard.innerHTML = `
                 <div class="clipboard-preview">
@@ -236,10 +237,14 @@ async function refreshClipboard(retries = 2) {
         }
 
         // Show last known clipboard from history if available
-        const data = await chrome.storage.local.get(['history']);
+        const data = await chrome.storage.local.get(['history', 'currentClipboard']);
         const history = data.history || [];
+        const current = data.currentClipboard || null;
 
-        if (history.length > 0) {
+        if (current?.text) {
+            displayCurrentClipboard(current.text);
+            currentClipboardText = current.text;
+        } else if (history.length > 0) {
             displayCurrentClipboard(history[0].text);
             currentClipboardText = history[0].text;
         } else {
@@ -269,51 +274,6 @@ function displayCurrentClipboard(text) {
 }
 
 // ========== UNIFIED HISTORY ==========
-
-/**
- * Add item to history
- * @param {string} text - The text content
- * @param {string} source - 'local' (copied) or 'synced' (received from another device)
- * @param {string} existingId - Optional ID if this is an existing item being updated
- * @returns {boolean} - Whether item was added (false if duplicate)
- */
-async function addToHistory(text, source = 'local', existingId = null) {
-    const data = await chrome.storage.local.get(['history']);
-    let history = data.history || [];
-
-    // Check for duplicates by text content or ID
-    const existingIndex = history.findIndex(h => h.text === text || (existingId && h.id === existingId));
-
-    if (existingIndex !== -1) {
-        // Item exists - move to top and update timestamp
-        const existing = history.splice(existingIndex, 1)[0];
-        existing.timestamp = Date.now();
-        // Keep original source - don't change synced to local
-        history.unshift(existing);
-        await chrome.storage.local.set({ history });
-        renderHistory(history);
-        return false;
-    }
-
-    // Create new item
-    const newItem = {
-        text: text,
-        timestamp: Date.now(),
-        id: existingId || crypto.randomUUID(),
-        source: source // 'local' or 'synced'
-    };
-
-    history.unshift(newItem);
-
-    // Auto-purge: keep only MAX_HISTORY items
-    if (history.length > MAX_HISTORY) {
-        history = history.slice(0, MAX_HISTORY);
-    }
-
-    await chrome.storage.local.set({ history });
-    renderHistory(history);
-    return true;
-}
 
 function renderHistory(items) {
     if (!els.historyList) return;
@@ -387,23 +347,11 @@ function addHistoryItemToDOM(item) {
         dropdown.classList.remove('open');
         activeDropdown = null;
 
-        // Update current clipboard display and move item to top of history
+        // Update current clipboard; previous current is moved to history in background state logic
         currentClipboardText = item.text;
         displayCurrentClipboard(item.text);
-
-        // Move this item to the top of history without creating a duplicate
-        const data = await chrome.storage.local.get(['history']);
-        let history = data.history || [];
-
-        // Find and move the item to the top
-        const itemIndex = history.findIndex(h => h.id === item.id);
-        if (itemIndex !== -1) {
-            const [movedItem] = history.splice(itemIndex, 1);
-            movedItem.timestamp = Date.now();
-            history.unshift(movedItem);
-            await chrome.storage.local.set({ history });
-            renderHistory(history);
-        }
+        await setCurrentClipboardState(item.text, 'local', item.id);
+        await syncFromStorage();
     });
 
     // Sync action
@@ -482,6 +430,7 @@ async function connect(code) {
             await chrome.storage.local.set({ syncCode: code });
             showDashboard(code);
             await refreshClipboard();
+            await syncFromStorage();
         } else {
             showError(res.error || "Connection failed");
         }
@@ -534,10 +483,31 @@ function updateStatus(connected) {
 // Receive Messages from background
 chrome.runtime.onMessage.addListener(async (msg) => {
     if (msg.cmd === 'incoming_text') {
-        // Add to history with source: synced
-        await addToHistory(msg.msg.text, 'synced');
+        if (msg.msg?.text) {
+            currentClipboardText = msg.msg.text;
+            displayCurrentClipboard(msg.msg.text);
+        }
+        await syncFromStorage();
+    }
+
+    if (msg.cmd === 'clipboard_state_updated') {
+        await syncFromStorage();
     }
 });
+
+async function setCurrentClipboardState(text, source = 'local', id = null) {
+    if (!text || !text.trim()) return;
+    await chrome.runtime.sendMessage({ cmd: 'set_current_clipboard', text, source, id });
+}
+
+async function syncFromStorage() {
+    const data = await chrome.storage.local.get(['history', 'currentClipboard']);
+    renderHistory(data.history || []);
+    if (data.currentClipboard?.text) {
+        currentClipboardText = data.currentClipboard.text;
+        displayCurrentClipboard(data.currentClipboard.text);
+    }
+}
 
 function escapeHtml(text) {
     const map = {

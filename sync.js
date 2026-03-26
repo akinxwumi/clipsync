@@ -3,26 +3,30 @@ import { generateCryptoKeys, encrypt, decrypt } from './utils.js';
 let peer = null;
 let myPeerId = null;
 let connections = []; // Array of active DataConnections
+let pendingPeers = new Set();
+let redialIntervalId = null;
 let receiveCallback = null;
 let currentKey = null; // CryptoKey
 let currentGroupId = null;
 
 const MAX_SLOTS = 10; // Try up to 10 device slots
+const REDIAL_INTERVAL_MS = 12000;
 
 export function onReceive(cb) {
     receiveCallback = cb;
 }
 
 export function isConnected() {
-    return !!peer && !peer.disconnected && !peer.destroyed;
+    return (
+        !!peer &&
+        !peer.disconnected &&
+        !peer.destroyed &&
+        connections.some(c => c.open)
+    );
 }
 
 export async function connect(syncCode) {
-    if (peer) {
-        peer.destroy();
-        peer = null;
-    }
-    connections = [];
+    teardownPeer();
 
     const { groupId, encryptionKey } = await generateCryptoKeys(syncCode);
     currentGroupId = groupId;
@@ -100,14 +104,16 @@ export async function connect(syncCode) {
 
     // Connect to all other possible slots
     connectToPeers(groupId);
+    startRedialLoop();
 }
 
 function connectToPeers(groupId) {
     for (let i = 1; i <= MAX_SLOTS; i++) {
         const targetId = `${groupId}-${i}`;
-        if (targetId === myPeerId) continue;
+        if (targetId === myPeerId || !shouldDialPeer(targetId)) continue;
 
         console.log(`Connecting to peer: ${targetId}`);
+        pendingPeers.add(targetId);
         const conn = peer.connect(targetId, { reliable: true });
         setupConnection(conn);
     }
@@ -127,7 +133,9 @@ function setupPeerEvents(p) {
 
     p.on('close', () => {
         console.log("Peer destroyed.");
+        stopRedialLoop();
         connections = [];
+        pendingPeers.clear();
     });
 
     p.on('error', (err) => {
@@ -162,6 +170,7 @@ function attemptReconnect(p, attemptCount) {
                     // Re-establish connections to peers
                     if (currentGroupId) {
                         connectToPeers(currentGroupId);
+                        startRedialLoop();
                     }
                 }
             }, 2000);
@@ -172,8 +181,16 @@ function attemptReconnect(p, attemptCount) {
 function setupConnection(conn) {
     conn.on('open', () => {
         console.log(`Connection opened: ${conn.peer}`);
+        pendingPeers.delete(conn.peer);
         // Add to list if not present
-        if (!connections.find(c => c.peer === conn.peer)) {
+        const existingIndex = connections.findIndex(c => c.peer === conn.peer);
+        if (existingIndex !== -1) {
+            const existing = connections[existingIndex];
+            if (existing !== conn) {
+                try { existing.close(); } catch (_) { }
+            }
+            connections[existingIndex] = conn;
+        } else {
             connections.push(conn);
         }
     });
@@ -195,11 +212,15 @@ function setupConnection(conn) {
     conn.on('close', () => {
         console.log(`Connection closed: ${conn.peer}`);
         connections = connections.filter(c => c.peer !== conn.peer);
+        pendingPeers.delete(conn.peer);
+        if (currentGroupId) connectToPeers(currentGroupId);
     });
 
     conn.on('error', (err) => {
         console.error(`Connection error with ${conn.peer}:`, err);
         connections = connections.filter(c => c.peer !== conn.peer);
+        pendingPeers.delete(conn.peer);
+        if (currentGroupId) connectToPeers(currentGroupId);
     });
 }
 
@@ -224,4 +245,39 @@ export async function broadcast(text) {
     });
 
     return message; // Return message meta for local storage
+}
+
+function shouldDialPeer(peerId) {
+    const hasOpenConn = connections.some(c => c.peer === peerId && c.open);
+    return !hasOpenConn && !pendingPeers.has(peerId);
+}
+
+function startRedialLoop() {
+    stopRedialLoop();
+    redialIntervalId = setInterval(() => {
+        if (!peer || peer.destroyed || peer.disconnected || !currentGroupId) return;
+        connectToPeers(currentGroupId);
+    }, REDIAL_INTERVAL_MS);
+}
+
+function stopRedialLoop() {
+    if (redialIntervalId) {
+        clearInterval(redialIntervalId);
+        redialIntervalId = null;
+    }
+}
+
+function teardownPeer() {
+    stopRedialLoop();
+    pendingPeers.clear();
+    connections.forEach(conn => {
+        try { conn.close(); } catch (_) { }
+    });
+    connections = [];
+
+    if (peer) {
+        try { peer.destroy(); } catch (_) { }
+        peer = null;
+    }
+    myPeerId = null;
 }
