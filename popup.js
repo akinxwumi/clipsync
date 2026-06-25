@@ -501,18 +501,20 @@ function updateStatus(connected) {
 }
 
 // Receive Messages from background
-chrome.runtime.onMessage.addListener(async (msg) => {
+chrome.runtime.onMessage.addListener((msg) => {
     if (msg.cmd === 'incoming_text') {
-        if (msg.msg?.text) {
-            currentClipboardText = msg.msg.text;
-            displayCurrentClipboard(msg.msg.text);
-            showClipboardBanner('New broadcast received', 'info');
-        }
-        await syncFromStorage();
+        (async () => {
+            if (msg.msg?.text) {
+                currentClipboardText = msg.msg.text;
+                displayCurrentClipboard(msg.msg.text);
+                showClipboardBanner('New broadcast received', 'info');
+            }
+            await syncFromStorage();
+        })();
     }
 
     if (msg.cmd === 'clipboard_state_updated') {
-        await syncFromStorage();
+        syncFromStorage();
     }
 });
 

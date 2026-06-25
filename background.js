@@ -71,7 +71,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     if (request.cmd === 'set_current_clipboard') {
-        updateClipboardState({
+        queueUpdateClipboardState({
             text: request.text,
             source: request.source || 'local',
             id: request.id || crypto.randomUUID(),
@@ -94,20 +94,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 data: request // pass full request object or properties
             }, (response) => {
                 // Forward response back to sender (Popup)
-                // Note: runtime.sendMessage error handling
                 if (chrome.runtime.lastError) {
                     sendResponse({ success: false, error: chrome.runtime.lastError.message });
+                } else if (response === undefined) {
+                    sendResponse({ success: false, error: "No response from offscreen" });
                 } else {
                     sendResponse(response);
                 }
             });
+        }).catch(err => {
+            sendResponse({ success: false, error: err.toString() });
         });
         return true; // Async wait for offscreen response
     }
 });
 
+let stateQueue = Promise.resolve();
+function queueUpdateClipboardState(nextItem) {
+    return new Promise((resolve, reject) => {
+        stateQueue = stateQueue.then(async () => {
+            try {
+                resolve(await updateClipboardState(nextItem));
+            } catch (err) {
+                reject(err);
+            }
+        });
+    });
+}
+
 async function handleIncomingText(msg) {
-    const state = await updateClipboardState({
+    const state = await queueUpdateClipboardState({
         text: msg.text,
         source: 'synced',
         id: msg.id || crypto.randomUUID(),
